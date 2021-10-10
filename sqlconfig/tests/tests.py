@@ -1,6 +1,6 @@
 import tempfile
 import unittest
-from .lib import load, dump
+from ..lib import load, dump
 import os
 
 class RoundtripTest(unittest.TestCase):
