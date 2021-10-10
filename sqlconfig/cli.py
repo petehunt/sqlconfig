@@ -5,8 +5,12 @@ import os
 import shutil
 import sys
 
+class UserError(Exception):
+    def __init__(self, message):
+        super().__init__(message)
+        self.message = message
 
-def main():
+def _main():
     parser = argparse.ArgumentParser(
         description="Convert a sqlite database to diffable flat files and back again"
     )
@@ -38,17 +42,17 @@ def main():
     overwrite = args.overwrite
 
     if dump == load:
-        raise RuntimeError("One of --dump or --load must be provided")
+        raise UserError("One of --dump or --load must be provided")
 
     if dir is None:
-        raise RuntimeError("--dir must be provided")
+        raise UserError("--dir must be provided")
 
     if db is None:
-        raise RuntimeError("--db must be provided")
+        raise UserError("--db must be provided")
 
     if dump:
         if os.path.exists(dir) and not overwrite:
-            raise RuntimeError(
+            raise UserError(
                 "dir exists, refusing to overwrite without --overwrite flag"
             )
 
@@ -89,7 +93,7 @@ def main():
 
     if load:
         if os.path.exists(db):
-            raise RuntimeError("Refusing to overwrite existing db")
+            raise UserError("Refusing to overwrite existing db")
         conn = sqlite3.connect(db)
         c = conn.cursor()
         with open(os.path.join(dir, "schema.sql"), "r") as f:
@@ -113,6 +117,14 @@ def main():
                 )
                 c.execute(query, row)
         conn.commit()
+
+def main():
+    try:
+        _main()
+    except UserError as e:
+        print("error:", e.message, file=sys.stderr)
+        print("Run with --help for more information.")
+        sys.exit(2)
 
 if __name__ == "__main__":
     main()
