@@ -41,7 +41,7 @@ def _main():
         action="store_true",
         help="whether the flat files can be overwritten",
     )
-    args = parser.parse_args(sys.argv[1:])
+    args, extra_args = parser.parse_known_args(sys.argv[1:])
     dump = args.dump
     load = args.load
     shell = args.shell
@@ -84,7 +84,7 @@ def _main():
             db = os.path.join(tempdir, "db.sql3")
             sql_load(db, dir)
             try:
-                subprocess.run(["sqlite3", db])
+                subprocess.run(["sqlite3", db, *extra_args])
             finally:
                 if overwrite:
                     sql_dump(db, dir)
