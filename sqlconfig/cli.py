@@ -31,7 +31,7 @@ def _main():
         "--shell",
         dest="shell",
         action="store_true",
-        help="Load flat files into a temporary database and run the sqlite3 shell"
+        help="Load flat files into a temporary database and run the sqlite3 shell. Use the '--' separator to pass extra args to sqlite3."
     )
     parser.add_argument("--db", dest="db", help="sqlite DB to use")
     parser.add_argument("--dir", dest="dir", help="directory to store the flat files")
@@ -41,7 +41,14 @@ def _main():
         action="store_true",
         help="whether the flat files can be overwritten",
     )
-    args, extra_args = parser.parse_known_args(sys.argv[1:])
+
+    if "--" in sys.argv:
+        index = sys.argv.index("--")
+        argv, extra_argv = sys.argv[1:index], sys.argv[index+1:]
+    else:
+        argv, extra_argv = sys.argv[1:], []
+
+    args = parser.parse_args(argv)
     dump = args.dump
     load = args.load
     shell = args.shell
@@ -84,7 +91,7 @@ def _main():
             db = os.path.join(tempdir, "db.sql3")
             sql_load(db, dir)
             try:
-                subprocess.run(["sqlite3", db, *extra_args])
+                subprocess.run(["sqlite3", db, *extra_argv])
             finally:
                 if overwrite:
                     sql_dump(db, dir)
