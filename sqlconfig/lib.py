@@ -3,15 +3,31 @@ from json import dump as json_dump, load as json_load
 import os
 import shutil
 
+class UserError(Exception):
+    def __init__(self, message, usage=True):
+        super().__init__(message)
+        self.message = message
+        self.usage = usage
+
+
 def dump(db, dir):
+    conn = sqlite3.connect(db)
+    c = conn.cursor()
+
+    # first, refuse to dump if any foreign key constraints are violated. unfortunately sqlite's default
+    # behavior is to disable foreign key constraints so it's possible that data may have been changed
+    # without checking those constraints. In this case we can make sure the data never hits the filesystem.
+
+    c.execute('pragma foreign_key_check')
+    num_bad_rows = len(c.fetchall())
+    if num_bad_rows > 0:
+      raise UserError(str(num_bad_rows) + ' rows failed foreign key integrity checks. Run "pragma foreign_key_check" in the sqlite shell for more information.', False)
+
     if os.path.exists(dir):
       shutil.rmtree(dir)
     os.makedirs(dir, exist_ok=True)
 
-    conn = sqlite3.connect(db)
-    c = conn.cursor()
-
-    # first get the full sql schema
+    # next get the full sql schema
     c.execute('select sql from sqlite_master where name not like "sqlite_%"')
     schema = []
     for (sql,) in c.fetchall():
@@ -42,9 +58,16 @@ def dump(db, dir):
 
 
 def load(db, dir):
+    if not os.path.exists(dir):
+      # nothing to do
+      return
     conn = sqlite3.connect(db)
     c = conn.cursor()
-    with open(os.path.join(dir, "schema.sql"), "r") as f:
+    schema_path = os.path.join(dir, "schema.sql")
+    if not os.path.exists(schema_path):
+      raise UserError("schema.sql file did not exist in " + dir, False)
+    c.execute("pragma foreign_keys=on")
+    with open(schema_path, "r") as f:
         c.executescript(f.read())
 
     c.execute(
@@ -63,5 +86,8 @@ def load(db, dir):
                 columns,
                 placeholders,
             )
-            c.execute(query, row)
+            try:
+                c.execute(query, row)
+            except sqlite3.IntegrityError as e:
+                raise UserError("IntegrityError inserting row " + repr(row) + " into table " + table_name + ": " + str(e), False)
     conn.commit()

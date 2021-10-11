@@ -4,12 +4,7 @@ import sys
 import tempfile
 import subprocess
 
-from .lib import dump as sql_dump, load as sql_load
-
-class UserError(Exception):
-    def __init__(self, message):
-        super().__init__(message)
-        self.message = message
+from .lib import UserError, dump as sql_dump, load as sql_load
 
 def _main():
     parser = argparse.ArgumentParser(
@@ -33,6 +28,12 @@ def _main():
         action="store_true",
         help="Load flat files into a temporary database and run the sqlite3 shell. Use the '--' separator to pass extra args to sqlite3."
     )
+    parser.add_argument(
+        "--check",
+        dest="check",
+        action="store_true",
+        help="Load the flat files into a temporary database and validate that all constraints are valid."
+    )
     parser.add_argument("--db", dest="db", help="sqlite DB to use")
     parser.add_argument("--dir", dest="dir", help="directory to store the flat files")
     parser.add_argument(
@@ -52,17 +53,18 @@ def _main():
     dump = args.dump
     load = args.load
     shell = args.shell
+    check = args.check
     db = args.db
     dir = args.dir
     overwrite = args.overwrite
 
-    if [dump, load, shell].count(True) != 1:
-        raise UserError("One of --dump, --load or --shell must be provided")
+    if [dump, load, shell, check].count(True) != 1:
+        raise UserError("One of --dump, --load, --check or --shell must be provided")
 
     if dir is None:
         raise UserError("--dir must be provided")
 
-    if not shell and db is None:
+    if not shell and not check and db is None:
         raise UserError("--db must be provided")
 
     if dump:
@@ -78,17 +80,27 @@ def _main():
             raise UserError("Refusing to overwrite existing db")
         sql_load(db, dir)
 
-    if shell:
+    if check:
         if db:
-            raise UserError("Cannot provide --db and --shell arguments together")
+            raise UserError("--db and --check cannot be used together")
+        if not os.path.exists(dir):
+            raise UserError("Directory does not exist: " + dir)
 
+        with tempfile.TemporaryDirectory() as tempdir:
+            db = os.path.join(tempdir, "db.sql3")
+            sql_load(db, dir)
+
+        print("OK", file=sys.stderr)
+
+    if shell:
         if not overwrite:
             print('Running shell in read-only mode. Pass --overwrite to save your changes', file=sys.stderr)
         if overwrite:
             print('Running shell in read-write mode.', file=sys.stderr)
 
         with tempfile.TemporaryDirectory() as tempdir:
-            db = os.path.join(tempdir, "db.sql3")
+            if db is None:
+                db = os.path.join(tempdir, "db.sql3")
             sql_load(db, dir)
             try:
                 subprocess.run(["sqlite3", db, *extra_argv])
@@ -102,7 +114,8 @@ def main():
         _main()
     except UserError as e:
         print("error:", e.message, file=sys.stderr)
-        print("Run with --help for more information.")
+        if e.usage:
+            print("Run with --help for more information.")
         sys.exit(2)
 
 if __name__ == "__main__":

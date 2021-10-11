@@ -16,6 +16,8 @@ However, flat files in a repo can get unwieldy:
 - It's easy to add invalid data
 - They're disorganized
 
+`sqlconfig` gives you all the advantages of config files stored in version control, with the power, flexibility and safety of SQL.
+
 ## The solution
 
 Model your config as a SQLite database. `sqlconfig` can deterministically turn that database into diffable flat files that live in the repo and back again.
