@@ -50,9 +50,9 @@ $ ls example_config/
 keyword_categories.json  keywords.json  schema.sql
 ```
 
-Note that the JSON files are printed deterministically and in a format that's easy for `git diff` to work with.
+The JSON files are printed deterministically and in a format that's easy for `git diff` to work with.
 
-Note one of the advantages of using SQL is that it's harder to write a bad config. For example, if we delete a keyword category without deleting all the keywords in it, we get an error.
+One of the advantages of using SQL is that it's harder to write a bad config. For example, if we delete a keyword category without deleting all the keywords in it, we get an error.
 
 ```
 $ sqlconfig --shell --dir example_config --overwrite
